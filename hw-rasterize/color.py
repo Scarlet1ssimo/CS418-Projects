@@ -23,3 +23,16 @@ def rgb_to_srgb(rgb_color):
     r, g, b = convert_color_component(r / 255.0, True), convert_color_component(
         g / 255.0, True), convert_color_component(b / 255.0, True)
     return (r * 255, g * 255, b * 255, a)
+
+
+def blendAlpha(dst, src):
+    rs, gs, bs, a_s = src
+    rd, gd, bd, a_d = dst
+    a_ = a_s+a_d*(1-a_s)
+
+    def blendEq(s, d): return 0 if a_ == 0 else (a_s*s+(1-a_s)*a_d*d)/a_
+    r_ = blendEq(rs, rd)
+    g_ = blendEq(gs, gd)
+    b_ = blendEq(bs, bd)
+    # print((rs, gs, bs, a_s), (rd, gd, bd, a_d), (r_, g_, b_, a_))
+    return [r_, g_, b_, a_]

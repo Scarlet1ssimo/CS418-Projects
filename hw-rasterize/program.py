@@ -1,6 +1,6 @@
 import sys
 from PIL import Image
-from color import srgb_to_rgb, rgb_to_srgb
+from color import srgb_to_rgb, rgb_to_srgb, blendAlpha
 import numpy as np
 
 curRGB = [255, 255, 255, 1]
@@ -121,7 +121,7 @@ def tri_common(keywords, text=False):
     i, j, k = map(lambda s: int(s) if int(s) < 0 else int(s)-1, keywords[1:])
     if cullEnabled and np.cross(points[i][:3]-points[j][:3], points[j][:3]-points[k][:3])[2] > 0:
         return
-    rasterize(points[i], points[j], points[k], text)
+    rasterizeTri(points[i], points[j], points[k], text)
 
 
 def callback_tri(keywords):
@@ -135,20 +135,21 @@ def callback_trit(keywords):
 def point_common(keywords, text=False):
     ps = float(keywords[1])*fsaaLevel
     i = int(keywords[2])
-    tl = points[i]
-    tr = points[i]
-    bl = points[i]
-    br = points[i]
+    tl = np.copy(points[i])
+    tr = np.copy(points[i])
+    bl = np.copy(points[i])
+    br = np.copy(points[i])
+    print(tl)
     tl[0:2] += [-ps/2, -ps/2]
-    tl[7:9] = [0, 0]
     tr[0:2] += [-ps/2, ps/2]
-    tr[7:9] = [0, 1]
     bl[0:2] += [ps/2, -ps/2]
-    bl[7:9] = [1, 0]
     br[0:2] += [ps/2, ps/2]
-    br[7:9] += [1, 1]
-    rasterize(tl, tr, br, text)
-    rasterize(br, bl, tl, text)
+    tl[8:10] = [0, 0]
+    tr[8:10] = [0, 1]
+    bl[8:10] = [1, 0]
+    br[8:10] = [1, 1]
+    rasterizeTri(tl, tr, br, text)
+    rasterizeTri(br, bl, tl, text)
 
 
 def callback_point(keywords):
@@ -194,7 +195,7 @@ def DDA(a, b, d):
     return S
 
 
-def rasterize(p1, p2, p3, text):
+def rasterizeTri(p1, p2, p3, text):
     # x:0 y:1 z:2 w:3
     if p1[1] > p2[1]:
         p1, p2 = p2, p1
@@ -215,19 +216,6 @@ def rasterize(p1, p2, p3, text):
         S = DDA(e1, e2, 0)
         for raster in S:
             putpixel(text, *raster)
-
-
-def blendAlpha(dst, src):
-    rs, gs, bs, a_s = dst
-    rd, gd, bd, a_d = src
-    a_ = a_s+a_d*(1-a_s)
-
-    def blendEq(s, d): return 0 if a_ == 0 else (a_s*s+(1-a_s)*a_d*d)/a_
-    r_ = blendEq(rs, rd)
-    g_ = blendEq(gs, gd)
-    b_ = blendEq(bs, bd)
-    # print((rs, gs, bs, a_s), (rd, gd, bd, a_d), (r_, g_, b_, a_))
-    return [r_, g_, b_, a_]
 
 
 def blend_forXY(X, Y, rs, gs, bs, a_s):
@@ -263,7 +251,7 @@ def putpixel(text, x, y, z, w, r, g, b, a, s, t):
             r, g, b, a = blendAlpha(get_texel(s, t), [r, g, b, a])
         else:
             r, g, b, a = get_texel(s, t)
-    if X < width and Y < height:
+    if 0 <= X < width and 0 <= Y < height:
         if depthEnabled:
             if -1 <= z/w <= depth[X, Y]:
                 blend_forXY(X, Y, r, g, b, a)
@@ -307,10 +295,6 @@ def draw():
 
 def divide(p, d):
     return p/p[d]
-
-
-def divideW(p):
-    return divide(p, 3)
 
 
 def divideWhyp(p):
