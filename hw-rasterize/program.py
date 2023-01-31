@@ -91,8 +91,6 @@ def my_shader(p):
     w = p[3]
     p[0] = (p[0]/w+1)*width/2
     p[1] = (p[1]/w+1)*height/2
-    # p[3] = 1
-    # p[4:] *= w
 
 
 def callback_texcoord(keywords):
@@ -139,7 +137,6 @@ def point_common(keywords, text=False):
     tr = np.copy(points[i])
     bl = np.copy(points[i])
     br = np.copy(points[i])
-    print(tl)
     tl[0:2] += [-ps/2, -ps/2]
     tr[0:2] += [-ps/2, ps/2]
     bl[0:2] += [ps/2, -ps/2]
@@ -166,13 +163,9 @@ def callback_billboard(keywords):
 
 def interp(a, b, p, d):
     if hypEnabled:
-        # return np.copy(p)
         A = divideWhyp(a)
         B = divideWhyp(b)
         P = divideWhyp(p)
-        # p[d]=(1-s)a+sb
-        # s = (P[d]-A[d])/(B[d]-A[d])
-        # ans = (1-s)*A+s*B
         return divideWhyp(((B[d]-P[d])*A+(P[d]-A[d])*B)/(B[d]-A[d]))
     else:
         return np.copy(p)
@@ -180,7 +173,6 @@ def interp(a, b, p, d):
 
 def DDA(a, b, d):
     S = []
-    # if hypEnabled:
 
     if a[d] == b[d]:
         return S
@@ -230,13 +222,8 @@ def get_texel(s, t):
         texture = Image.open(texturefile)
         texwidth, texheight = texture.size
         texdata = texture.getdata()
-    # print(s, t)
     s, t = s-np.floor(s), t-np.floor(t)
     S, T = round(s*texwidth) % texwidth, round(t*texheight) % texheight
-    # print(s, t, S, T)
-    # print(data[S*texheight+T])
-    # print(S, T, texwidth, texheight, S*texheight+T)
-    # return texdata[S*texheight+T]
     r, g, b, a = texdata[S+T*texwidth]
     a /= 255
     # if sRGBEnabled:
@@ -248,7 +235,7 @@ def putpixel(text, x, y, z, w, r, g, b, a, s, t):
     X, Y = round(x), round(y)
     if text:
         if decalsEnabled:
-            r, g, b, a = blendAlpha(get_texel(s, t), [r, g, b, a])
+            r, g, b, a = blendAlpha([r, g, b, a], get_texel(s, t))
         else:
             r, g, b, a = get_texel(s, t)
     if 0 <= X < width and 0 <= Y < height:
