@@ -5,7 +5,8 @@ import numpy as np
 
 curRGB = [255, 255, 255, 1]
 curST = [0, 0]
-points = []  # x,y,z,w,r,g,b,s,t
+points = []  # x,y,z,w,r,g,b,a,s,t
+clipplanes = []  # p1 p2 p3 p4 _ _ _ _ _
 depthEnabled = False
 sRGBEnabled = False
 hypEnabled = False
@@ -65,6 +66,23 @@ def callback_decals(keywords):
     decalsEnabled = True
 
 
+def callback_frustum(keywords):
+    global clipplanes
+    clipplanes += [np.array([1, 0, 0, 1, 0, 0, 0, 0, 0, 0]),
+                   np.array([-1, 0, 0, 1, 0, 0, 0, 0, 0, 0]),
+                   np.array([0, 1, 0, 1, 0, 0, 0, 0, 0, 0]),
+                   np.array([0, -1, 0, 1, 0, 0, 0, 0, 0, 0]),
+                   np.array([0, 0, 1, 1, 0, 0, 0, 0, 0, 0]),
+                   np.array([0, 0, -1, 1, 0, 0, 0, 0, 0, 0]),
+                   ]
+
+
+def callback_clipplane(keywords):
+    P = np.array(
+        list(map(float, keywords[1:]))+[0, 0, 0, 0, 0, 0], dtype=float)
+    clipplanes.append(P)
+
+
 def callback_fsaa(keywords):
     global fsaaLevel
     global width
@@ -82,15 +100,20 @@ def callback_xyzw(keywords):
         RGB_eff = srgb_to_rgb(RGB_eff)
     P = np.array(
         list(map(float, keywords[1:]))+list(RGB_eff)+list(curST), dtype=float)
-    my_shader(P)
+    if not clipplanes:
+        my_shader(P)
     points.append(P)
 
 
-def my_shader(p):
+def my_shader(p, reverse=False):
     # viewport
     w = p[3]
-    p[0] = (p[0]/w+1)*width/2
-    p[1] = (p[1]/w+1)*height/2
+    if reverse:
+        p[0] = (p[0]/(width/2)-1)*w
+        p[1] = (p[1]/(height/2)-1)*w
+    else:
+        p[0] = (p[0]/w+1)*width/2
+        p[1] = (p[1]/w+1)*height/2
 
 
 def callback_texcoord(keywords):
@@ -187,7 +210,7 @@ def DDA(a, b, d):
     return S
 
 
-def rasterizeTri(p1, p2, p3, text):
+def rasterizeTriRaw(p1, p2, p3, text):
     # x:0 y:1 z:2 w:3
     if p1[1] > p2[1]:
         p1, p2 = p2, p1
@@ -208,6 +231,64 @@ def rasterizeTri(p1, p2, p3, text):
         S = DDA(e1, e2, 0)
         for raster in S:
             putpixel(text, *raster)
+
+
+def trydouble(p1, p2, p3, cp):
+    def intersect(p, q, dp, dq):
+        e = (dq*p-dp*q)/(dq-dp)
+        return interp(p, q, e, 2)
+    d1, d2, d3 = np.dot(cp, p1), np.dot(cp, p2), np.dot(cp, p3)
+    if d1 >= 0 and d2 >= 0 and d3 >= 0:
+        return [(p1, p2, p3)]
+    if d1*d2 < 0:
+        e = intersect(p1, p2, d1, d2)
+        return [(p1, e, p3), (p2, e, p3)]
+    if d3*d2 < 0:
+        e = intersect(p3, p2, d3, d2)
+        return [(p3, e, p1), (p2, e, p1)]
+    if d1*d3 < 0:
+        e = intersect(p1, p3, d1, d3)
+        return [(p1, e, p2), (p3, e, p2)]
+    return []
+
+
+def discard(p1, p2, p3, cp):
+    d1, d2, d3 = np.dot(cp, p1), np.dot(cp, p2), np.dot(cp, p3)
+    if d1 >= 0 and d2 >= 0 and d3 >= 0:
+        return True
+
+
+def clipone(p1, p2, p3, cp):
+    S = trydouble(p1, p2, p3, cp)
+    nS = []
+    for i in S:
+        nS += trydouble(*i, cp)
+    nS = filter(lambda tri: discard(*tri, cp), nS)
+    return nS
+
+
+def rasterizeTri(p1, p2, p3, text):
+    def clipping(S, cp):
+        nS = []
+        for i in S:
+            nS += clipone(*i, cp)
+        return nS
+
+    if clipplanes:
+        S = [(p1, p2, p3)]
+        for cp in clipplanes:
+            S = clipping(S, cp)
+        for tri in S:
+            p1, p2, p3 = tri
+            p1 = p1.copy()
+            p2 = p2.copy()
+            p3 = p3.copy()
+            my_shader(p1)
+            my_shader(p2)
+            my_shader(p3)
+            rasterizeTriRaw(p1, p2, p3, text)
+    else:
+        rasterizeTriRaw(p1, p2, p3, text)
 
 
 def blend_forXY(X, Y, rs, gs, bs, a_s):

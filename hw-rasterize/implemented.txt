@@ -14,3 +14,5 @@ mp1point.txt
 mp1rgba.txt
 mp1srgb.txt
 mp1texture.txt
+mp1clipplane.txt
+mp1frustum.txt
