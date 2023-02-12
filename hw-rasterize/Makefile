@@ -1,7 +1,7 @@
 .PHONEY: build, run
 SRCS = $(wildcard test/*.txt)
 all:	$(SRCS:mp1%.txt=%.run)
-done: compindexing compreq1 compreq2 compcull compdecals compdepth compfsaa2 compfsaa3 compfsaa4 comphyp comphyptex compindexing comppoint comprgba compsrgb comptexture compclipplane compfrustum
+done: compindexing compreq1 compreq2 compcull compdecals compdepth compfsaa2 compfsaa3 compfsaa4 comphyp comphyptex compindexing comppoint comprgba compsrgb comptexture compclipplane compfrustum compline
 run%:
 	python3 program.py test/mp1$*.txt
 comp%: run%

@@ -142,7 +142,7 @@ def tri_common(keywords, text=False):
     i, j, k = map(lambda s: int(s) if int(s) < 0 else int(s)-1, keywords[1:])
     if cullEnabled and np.cross(points[i][:3]-points[j][:3], points[j][:3]-points[k][:3])[2] > 0:
         return
-    rasterizeTri(points[i], points[j], points[k], text)
+    clipAndRasterizeTri(points[i], points[j], points[k], text)
 
 
 def callback_tri(keywords):
@@ -168,8 +168,8 @@ def point_common(keywords, text=False):
     tr[8:10] = [0, 1]
     bl[8:10] = [1, 0]
     br[8:10] = [1, 1]
-    rasterizeTri(tl, tr, br, text)
-    rasterizeTri(br, bl, tl, text)
+    clipAndRasterizeTri(tl, tr, br, text)
+    clipAndRasterizeTri(br, bl, tl, text)
 
 
 def callback_point(keywords):
@@ -180,9 +180,14 @@ def callback_billboard(keywords):
     point_common(keywords, True)
 
 
+def callback_line(keywords):
+    i, j = map(lambda s: int(s) if int(s) < 0 else int(s)-1, keywords[1:])
+    rasterizeLineRaw(points[i], points[j])
+
 #
 # Utility functions -- rasterization and interpolation
 #
+
 
 def interp(a, b, p, d):
     if hypEnabled:
@@ -233,42 +238,47 @@ def rasterizeTriRaw(p1, p2, p3, text):
             putpixel(text, *raster)
 
 
-def trydouble(p1, p2, p3, cp):
-    def intersect(p, q, dp, dq):
-        e = (dq*p-dp*q)/(dq-dp)
-        return interp(p, q, e, 2)
-    d1, d2, d3 = np.dot(cp, p1), np.dot(cp, p2), np.dot(cp, p3)
-    if d1 >= 0 and d2 >= 0 and d3 >= 0:
-        return [(p1, p2, p3)]
-    if d1*d2 < 0:
-        e = intersect(p1, p2, d1, d2)
-        return [(p1, e, p3), (p2, e, p3)]
-    if d3*d2 < 0:
-        e = intersect(p3, p2, d3, d2)
-        return [(p3, e, p1), (p2, e, p1)]
-    if d1*d3 < 0:
-        e = intersect(p1, p3, d1, d3)
-        return [(p1, e, p2), (p3, e, p2)]
-    return []
+def rasterizeLineRaw(p1, p2):
+    # determine d
+    d = 1 if abs(p1[1]-p2[1]) > abs(p1[0]-p2[0]) else 0
+    if p1[d] > p2[d]:
+        p1, p2 = p2, p1
+    S = DDA(p1, p2, d)
+    for raster in S:
+        putpixel(False, *raster)
 
 
-def discard(p1, p2, p3, cp):
-    d1, d2, d3 = np.dot(cp, p1), np.dot(cp, p2), np.dot(cp, p3)
-    if d1 >= 0 and d2 >= 0 and d3 >= 0:
-        return True
-
-
-def clipone(p1, p2, p3, cp):
-    S = trydouble(p1, p2, p3, cp)
-    nS = []
-    for i in S:
-        nS += trydouble(*i, cp)
-    nS = filter(lambda tri: discard(*tri, cp), nS)
-    return nS
-
-
-def rasterizeTri(p1, p2, p3, text):
+def clipAndRasterizeTri(p1, p2, p3, text):
     def clipping(S, cp):
+        def clipone(p1, p2, p3, cp):
+            def trydouble(p1, p2, p3, cp):
+                def intersect(p, q, dp, dq):
+                    e = (dq*p-dp*q)/(dq-dp)
+                    return interp(p, q, e, 2)
+                d1, d2, d3 = np.dot(cp, p1), np.dot(cp, p2), np.dot(cp, p3)
+                if d1 >= 0 and d2 >= 0 and d3 >= 0:
+                    return [(p1, p2, p3)]
+                if d1*d2 < 0:
+                    e = intersect(p1, p2, d1, d2)
+                    return [(p1, e, p3), (p2, e, p3)]
+                if d3*d2 < 0:
+                    e = intersect(p3, p2, d3, d2)
+                    return [(p3, e, p1), (p2, e, p1)]
+                if d1*d3 < 0:
+                    e = intersect(p1, p3, d1, d3)
+                    return [(p1, e, p2), (p3, e, p2)]
+                return []
+
+            def discard(p1, p2, p3, cp):
+                d1, d2, d3 = np.dot(cp, p1), np.dot(cp, p2), np.dot(cp, p3)
+                if d1 >= 0 and d2 >= 0 and d3 >= 0:
+                    return True
+            S = trydouble(p1, p2, p3, cp)
+            nS = []
+            for i in S:
+                nS += trydouble(*i, cp)
+            nS = filter(lambda tri: discard(*tri, cp), nS)
+            return nS
         nS = []
         for i in S:
             nS += clipone(*i, cp)
@@ -279,10 +289,7 @@ def rasterizeTri(p1, p2, p3, text):
         for cp in clipplanes:
             S = clipping(S, cp)
         for tri in S:
-            p1, p2, p3 = tri
-            p1 = p1.copy()
-            p2 = p2.copy()
-            p3 = p3.copy()
+            p1, p2, p3 = map(lambda x: x.copy(), tri)
             my_shader(p1)
             my_shader(p2)
             my_shader(p3)
@@ -319,6 +326,7 @@ def putpixel(text, x, y, z, w, r, g, b, a, s, t):
             r, g, b, a = blendAlpha([r, g, b, a], get_texel(s, t))
         else:
             r, g, b, a = get_texel(s, t)
+
     if 0 <= X < width and 0 <= Y < height:
         if depthEnabled:
             if -1 <= z/w <= depth[X, Y]:
@@ -335,8 +343,6 @@ def draw():
             Y = j*fsaaLevel
             multisamples = bitmap[X:X+fsaaLevel,
                                   Y:Y+fsaaLevel]
-            # print(multisamples.mean(axis=(0, 1)))
-            # r, g, b, a = multisamples.mean(axis=(0, 1))
             sum_a = multisamples[:, :, 3].sum()
             mixed_color = np.zeros((3,), dtype=float)
             if sum_a == 0:
