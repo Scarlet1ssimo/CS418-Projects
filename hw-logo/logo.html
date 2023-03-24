@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>Dancing LOGO</title>
+    <script src="basic.js"></script>
+    <script src="logo.js"></script>
+    <script src="warmup.js"></script>
+    <script src="cpu.js"></script>
+    <script src="gpu.js"></script>
+    <script src="mouse.js"></script>
+    <script src="psy.js"></script>
+    <script src="coll.js"></script>
+    <script src="math.js"></script>
+</head>
+
+<body>
+    <label><input type="radio" name="example" value="LOGO" /> Required 1: The "I" logo spinning counterclockwise
+        while moving along a oval-like path</label>
+    <br />
+    <label><input type="radio" name="example" value="Warmup" /> Required 2: Another animation from the warmup</label>
+    <br />
+    <label><input type="radio" name="example" value="CPU" /> Optional 1: CPU-based vertex movement</label>
+    <br />
+    <label><input type="radio" name="example" value="GPU" /> Optional 2: GPU-based vertex movement</label>
+    <br />
+    <label><input type="radio" name="example" value="Coll" /> Optional 3: Collisions sensitive movement (if the movement stuck, toggle to somewhere and back again)</label>
+    <br />
+    <label><input type="radio" name="example" value="Psych" /> Optional 4: Psychedelic background</label>
+    <br />
+    <label><input type="radio" name="example" value="Mouse" checked /> Optional 5: Mouse-sensitive movement based on F=GMm/r^2</label>
+    <br />
+    <canvas width="500" height="500" id="canvas" style="background:yellow"></canvas>
+</body>
+
+</html>
