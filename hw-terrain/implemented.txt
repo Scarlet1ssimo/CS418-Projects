@@ -1,0 +1,7 @@
+Shiny (10 points)
+Height-based color ramp (20 points)
+Rocky cliffs (20 points)
+UV-sphere (10 points)
+Torus (15 points)
+Spheroidal Weathering (20 points)
+Icosphere (30 points)

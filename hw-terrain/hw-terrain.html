@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>CS 418 Terrain project</title>
+    <script src="scene-option-tree.js"></script><!-- handles controls -->
+    <script src="main.js"></script><!-- handles controls -->
+    <script src="math.js"></script><!-- handles controls -->
+    <script src="matrices.js"></script><!-- handles controls -->
+
+
+    <script>// configures controls
+        /**
+         * Modify this object to chose what options you want in the control pane.
+         * Top-level entries become top-section radio buttons.
+         * Nested entries become lower-section inputs of various types.
+         */
+
+        var controlOptions = {
+            "terrain": {
+                "label": "Required: Faulting-method terrain"
+                , "options":
+                {
+                    "resolution": { "type": "number", "default": 100, "label": "Grid size" },
+                    "slices": { "type": "number", "default": 100, "label": "Fractures" },
+                    "decay": { "type": "number", "default": 0.9, "label": "Decay (≤1)" },
+                    "sph": { "type": "number", "default": 0, "label": "Spheroidal passes" },
+                    // "hyd": { "type": "number", "default": 5, "label": "Hydraulic passes" },
+                    "lightType": {
+                        "type": "radio"
+                        , "options":
+                        {
+                            0: "Shiny: Lambert",
+                            1: "Shiny: Phong",
+                            2: "Shiny: Blinn-Phong",
+                        }
+                    },
+                    "coloring": {
+                        "type": "radio"
+                        , "options":
+                        {
+                            0: "Coloring: Default",
+                            1: "Coloring: Height-based color ramp",
+                            2: "Coloring: Rocky cliffs",
+                        }
+                    },
+                    "RotatingLight": {
+                        "type": "checkbox",
+                        "default": true,
+                        "label": "Use a rotating light source"
+                    }
+                }
+            }, "UVsphere": {
+                "label": "Optional: UVsphere"
+                , "options":
+                {
+                    "lat": { "type": "number", "default": 3, "label": "latitude rings" },
+                    "long": { "type": "number", "default": 4, "label": "longitude slices" },
+                    "lightType": {
+                        "type": "radio"
+                        , "options":
+                        {
+                            0: "Lighting: Lambert",
+                            1: "Lighting: Phong",
+                            2: "Lighting: Blinn-Phong",
+                        }
+                    },
+                    "coloring": {
+                        "type": "radio"
+                        , "options":
+                        {
+                            0: "Coloring: Default",
+                            1: "Coloring: Height-based color ramp",
+                        }
+                    },
+                    "RotatingLight": {
+                        "type": "checkbox",
+                        "default": true,
+                        "label": "Use a rotating light source"
+                    }
+                }
+            }, "torus": {
+                "label": "Optional: Torus"
+                , "options":
+                {
+                    "rings": { "type": "number", "default": 8, "label": "Number of rings" },
+                    "points": { "type": "number", "default": 12, "label": "Points per ring" },
+                    "r1": { "type": "number", "default": 0.3, "label": "Major radius" },
+                    "r2": { "type": "number", "default": 0.1, "label": "Minor radius" },
+                    "lightType": {
+                        "type": "radio"
+                        , "options":
+                        {
+                            0: "Lighting: Lambert",
+                            1: "Lighting: Phong",
+                            2: "Lighting: Blinn-Phong",
+                        }
+                    },
+                    "coloring": {
+                        "type": "radio"
+                        , "options":
+                        {
+                            0: "Coloring: Default",
+                            1: "Coloring: Height-based color ramp",
+                        }
+                    },
+                    "RotatingLight": {
+                        "type": "checkbox",
+                        "default": true,
+                        "label": "Use a rotating light source"
+                    }
+                }
+            }, "icosphere": {
+                "label": "Optional: Icosphere"
+                , "options":
+                {
+                    "iteration": { "type": "number", "default": 0, "label": "Fractures (<8)" },
+                    "lightType": {
+                        "type": "radio"
+                        , "options":
+                        {
+                            0: "Lighting: Lambert",
+                            1: "Lighting: Phong",
+                            2: "Lighting: Blinn-Phong",
+                        }
+                    },
+                    "coloring": {
+                        "type": "radio"
+                        , "options":
+                        {
+                            0: "Coloring: Default",
+                            1: "Coloring: Height-based color ramp",
+                        }
+                    },
+                    "RotatingLight": {
+                        "type": "checkbox",
+                        "default": true,
+                        "label": "Use a rotating light source"
+                    }
+                }
+            }
+        }
+    </script>
+
+
+    <script>// Placeholder script; edit or move to separate file
+        const IlliniBlue = new Float32Array([0.075, 0.16, 0.292, 1])
+        const IlliniOrange = new Float32Array([1, 0.373, 0.02, 1])
+        /**
+         * Draw one frame
+         */
+        function draw() {
+            gl.clearColor(...IlliniBlue) // f(...[1,2,3]) means f(1,2,3)
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+            gl.useProgram(program)
+
+            gl.bindVertexArray(geom.vao)
+
+            gl.uniform4fv(gl.getUniformLocation(program, 'color'), IlliniOrange)
+            // gl.uniform3fv(gl.getUniformLocation(program, 'lightdir'), lightdir)
+            gl.uniform1i(gl.getUniformLocation(program, 'lightType'), options["lightType"])
+            gl.uniform1i(gl.getUniformLocation(program, 'colorType'), options["coloring"])
+            gl.uniformMatrix4fv(gl.getUniformLocation(program, 'p'), false, p)
+            gl.uniformMatrix4fv(gl.getUniformLocation(program, 'mv'), false, m4mult(v, m))
+            gl.uniform2fv(gl.getUniformLocation(program, 'maxmin'), options.maxmin)
+            gl.drawElements(geom.mode, geom.count, geom.type, 0)
+
+        }
+
+        /**
+         * Resizes the canvas to completely fill the screen
+         */
+        function fillScreen() {
+            let canvas = document.querySelector('canvas')
+            document.body.style.margin = '0'
+            canvas.style.width = '100%'
+            canvas.style.height = '100%'
+            canvas.width = canvas.clientWidth
+            canvas.height = canvas.clientHeight
+            canvas.style.width = ''
+            canvas.style.height = ''
+            // to do: update aspect ratio of projection matrix here
+            window.p = m4perspNegZ(1, 9, 0.7, canvas.width, canvas.height)
+            if (window.gl) {
+                gl.viewport(0, 0, canvas.width, canvas.height)
+                draw()
+            }
+        }
+
+        /**
+         * Compile, link, other option-independent setup
+         */
+        async function onSceneChange() {
+            let vs = await fetch('mainv.glsl').then(res => res.text())
+            let fs = await fetch('mainf.glsl').then(res => res.text())
+            window.program = compileAndLinkGLSL(vs, fs)
+            gl.enable(gl.DEPTH_TEST)
+            window.m = m4ident()
+            window.v = m4ident()
+            window.p = m4ident()
+
+            // let data = await fetch('monkey.json').then(r => r.json())
+            var data;
+            if (scene == "terrain")
+                data = faultingMethod(options.resolution, options.slices, options.sph, 0)
+            else if (scene == "torus")
+                data = torus(options.rings, options.points, options.r1, options.r2)
+            // data = icosphere(1)
+            else if (scene == "icosphere")
+                data = icosphere(options.iteration)
+            else if (scene == "UVsphere")
+                data = UVsphere(options.lat, options.long)
+            addNormals(data)
+            window.geom = setupGeomery(data, program)
+
+            window.pending = requestAnimationFrame(timeStep)
+            fillScreen()
+        }
+        async function setup(event) {
+            scene = "terrain"
+            window.options = { resolution: 100, slices: 100, sph: 0, decay: 0.9 }
+            window.gl = document.querySelector('canvas').getContext('webgl2',
+                // optional configuration object: see https://developer.mozilla.org/en-US/docs/Web/API/HTMLCanvasElement/getContext
+                { antialias: false, depth: true, preserveDrawingBuffer: true }
+            )
+            onSceneChange()
+        }
+
+        /**
+         * Generate geometry, render the scene
+         */
+        async function setupScene(scene, options) {
+            cancelAnimationFrame(window.pending)
+            console.log("To do: render", scene, "with options", options)
+            window.options = options
+            window.scene = scene
+            onSceneChange()
+        }
+
+        window.addEventListener('load', setup)
+        window.addEventListener('resize', fillScreen)
+    </script>
+
+
+
+    <!-- DO NOT MODIFY anything below this line -->
+    <style>
+        body {
+            margin: 0;
+            border: none;
+            padding: 0;
+            display: flex;
+        }
+
+        .controls {
+            width: min(50%, 20em);
+            padding: 1em;
+            flex: 0 0 min(50%, 20em);
+        }
+
+        .controls label {
+            display: block;
+        }
+
+        .display {
+            flex-grow: 1;
+            height: 100vh;
+            line-height: 0rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="controls">
+        <form>
+            <div id="set1"></div>
+            <hr />
+            <div id="set2"></div>
+            <hr />
+            <input type="submit" value="Generate object" />
+        </form>
+    </div>
+    <div class="display"><canvas width="500" height="500"></canvas></div>
+</body>
+
+</html>
