@@ -1,84 +1,24 @@
-#include "vec.h"
 #define cimg_use_png
 #define cimg_display 0
 #include "CImg.h"
 #include "geometry.h"
+#include "grouping.h"
+#include "utility.h"
+#include "vec.h"
 #include <bits/stdc++.h>
 #include <fstream>
 using namespace std;
-std::vector<std::string> split(std::string s, std::string delimiter) {
-  size_t pos_start = 0, pos_end, delim_len = delimiter.length();
-  std::string token;
-  std::vector<std::string> res;
-
-  while ((pos_end = s.find(delimiter, pos_start)) != std::string::npos) {
-    token = s.substr(pos_start, pos_end - pos_start);
-    pos_start = pos_end + delim_len;
-    res.push_back(token);
-  }
-
-  res.push_back(s.substr(pos_start));
-  return res;
-}
 
 World world;
 optional<double> expose_v;
 vec3 rgb2srgb(vec3 rgb) {
-  if (expose_v.has_value())
+  if (expose_v.has_value()) {
     rgb = mapeach(rgb, [](double x) { return 1 - exp(-x * expose_v.value()); });
+  }
   return mapeach(rgb, [](double x) {
     return x <= 0.0031308 ? 12.92 * x : 1.055 * pow(x, 1.0 / 2.4) - 0.055;
   });
 }
-struct MatrialFactory {
-  bool changed = true;
-  vec3 Shininess;
-  vec3 Transparency;
-  double Ior;
-  double Roughness;
-  vec3 ST;
-  MatrialFactory()
-      : Shininess(vec3(0, 0, 0)), Transparency(vec3(0, 0, 0)), Ior(1.458),
-        Roughness(0), ST(vec3(0, 0, 0)) {}
-  void setShininess(vec3 x) {
-    changed = true;
-    Shininess = x;
-  }
-  void setShininess(double x) {
-    changed = true;
-    Shininess = vec3(x, x, x);
-  }
-  void setTransparency(vec3 x) {
-    changed = true;
-    Transparency = x;
-  }
-  void setTransparency(double x) {
-    changed = true;
-    Transparency = vec3(x, x, x);
-  }
-  void setIor(double x) {
-    changed = true;
-    Ior = x;
-  }
-  void setRoughness(double x) {
-    changed = true;
-    Roughness = x;
-  }
-  void setST(vec3 x) {
-    changed = true;
-    ST = x;
-  }
-
-  shared_ptr<Material> curMaterial() {
-    static shared_ptr<Material> lastMaterial = nullptr;
-    if (changed) {
-      lastMaterial =
-          make_shared<Material>(Shininess, Transparency, Ior, Roughness, ST);
-      changed = false;
-    }
-    return lastMaterial;
-  }
-} MF;
 
 vec3 curColor = vec3(1, 1, 1);
 int bounces = 4;
@@ -90,6 +30,8 @@ void calibration() {
   Right = unit_vector(cross(Forward, Up));
   Up = unit_vector(cross(Right, Forward));
 }
+
+MatrialFactory MF;
 void makeObj(shared_ptr<Leaf> objptr) {
   objptr->color = curColor;
   objptr->material = MF.curMaterial();
@@ -99,28 +41,69 @@ void makeLight(shared_ptr<Light> lightptr) {
   lightptr->color = curColor;
   world.add(lightptr);
 }
+
 int main(int argc, char *argv[]) {
+  // feenableexcept(FE_INVALID | FE_OVERFLOW);
   int width, height;
   string filename;
   (void)argc;
+  vector<vec3> xyzs;
+  vector<vec3> normals;
+  vector<vec3> texcoords;
+  vec3 curNormal;
+  double S, T;
+  int aaRays = 0, gid = 0;
+  bool doNormal = false;
+  bool doTexcoord = false;
+  bool fisheye = false;
+  bool panorama = false;
+  bool dof = false;
+  double focus, lens;
 
   // first pass: read scene
   ifstream fin(argv[1]);
   for (string s; getline(fin, s);) {
-    bool prev_is_space = true;
-    s.erase(std::remove_if(s.begin(), s.end(),
-                           [&prev_is_space](unsigned char curr) {
-                             bool r = std::isspace(curr) && prev_is_space;
-                             prev_is_space = std::isspace(curr);
-                             return r;
-                           }),
-            s.end());
+    trim(s);
+    remove_extra_space(s);
     auto ss = split(s, " ");
     auto keyword = ss[0];
     if (keyword == "png") { // png width height filename
       width = stoi(ss[1]);
       height = stoi(ss[2]);
       filename = ss[3];
+    } else if (keyword == "xyz") {
+      xyzs.push_back(vec3(stod(ss[1]), stod(ss[2]), stod(ss[3])));
+      if (doNormal)
+        normals.push_back(curNormal);
+      if (doTexcoord)
+        texcoords.push_back(vec3(S, T, 0));
+    } else if (keyword == "normal") {
+      curNormal = vec3(stod(ss[1]), stod(ss[2]), stod(ss[3]));
+      doNormal = true;
+    } else if (keyword == "texcoord") {
+      S = stod(ss[1]);
+      T = stod(ss[2]);
+      doTexcoord = true;
+    } else if (keyword == "trit") {
+      int idx1 = stoi(ss[1]), idx2 = stoi(ss[2]), idx3 = stoi(ss[3]);
+      idx1 = idx1 < 0 ? xyzs.size() + idx1 : idx1 - 1;
+      idx2 = idx2 < 0 ? xyzs.size() + idx2 : idx2 - 1;
+      idx3 = idx3 < 0 ? xyzs.size() + idx3 : idx3 - 1;
+      makeObj(make_shared<TriangleText>(xyzs[idx1], xyzs[idx2], xyzs[idx3],
+                                        texcoords[idx1], texcoords[idx2],
+                                        texcoords[idx3]));
+    } else if (keyword == "trif") {
+      int idx1 = stoi(ss[1]), idx2 = stoi(ss[2]), idx3 = stoi(ss[3]);
+      idx1 = idx1 < 0 ? xyzs.size() + idx1 : idx1 - 1;
+      idx2 = idx2 < 0 ? xyzs.size() + idx2 : idx2 - 1;
+      idx3 = idx3 < 0 ? xyzs.size() + idx3 : idx3 - 1;
+      if (doNormal) {
+        makeObj(make_shared<TriangleInterpNormal>(
+            xyzs[idx1], xyzs[idx2], xyzs[idx3], normals[idx1], normals[idx2],
+            normals[idx3]));
+      } else
+        makeObj(
+            make_shared<TriangleSimple>(xyzs[idx1], xyzs[idx2], xyzs[idx3]));
     } else if (keyword == "sphere") { // sphere x y z r
       makeObj(make_shared<Sphere>(vec3(stod(ss[1]), stod(ss[2]), stod(ss[3])),
                                   stod(ss[4])));
@@ -151,6 +134,8 @@ int main(int argc, char *argv[]) {
       MF.setIor(stod(ss[1]));
     } else if (keyword == "roughness") {
       MF.setRoughness(stod(ss[1]));
+    } else if (keyword == "texture") {
+      MF.setTexture(ss[1]);
     } else if (keyword == "bounces") {
       bounces = stoi(ss[1]);
     } else if (keyword == "eye") {
@@ -163,23 +148,98 @@ int main(int argc, char *argv[]) {
       calibration();
     } else if (keyword == "expose") {
       expose_v = stod(ss[1]);
+    } else if (keyword == "fisheye") {
+      fisheye = true;
+    } else if (keyword == "panorama") {
+      panorama = true;
+    } else if (keyword == "aa") {
+      aaRays = stoi(ss[1]);
+    } else if (keyword == "gi") {
+      gid = stoi(ss[1]);
+    } else if (keyword == "dof") {
+      dof = true;
+      focus = stod(ss[1]);
+      lens = stod(ss[2]);
     }
   }
-
+  cout << "First Pass" << endl;
+  world.bvh->selfBalance();
+  cout << world.bvh->str() << endl;
+  cout << world.objs.size() << " objects" << endl;
+  cout << world.lights.size() << " lights" << endl;
   // second pass: render
   cimg_library::CImg<unsigned char> image(width, height, 1, 4);
-  for (int x = 0; x < width; x++)
+  auto normalizedForward = unit_vector(Forward);
+  for (int x = 0; x < width; x++) {
     for (int y = 0; y < height; y++) {
-      auto sx = (2.0 * x - width) / max(width, height);
-      auto sy = (height - 2.0 * y) / max(width, height);
-      auto ray = Ray(Eye, sx * Right + sy * Up + Forward);
-      auto color = world.getColor(ray, bounces);
+      // cout << x << ' ' << y << endl;
+      auto getColor = [&]() -> optional<vec3> {
+        double xx = x, yy = y;
+        if (aaRays > 0) {
+          xx += random_uniform() - 0.5;
+          yy += random_uniform() - 0.5;
+        }
+        auto sx = (2.0 * xx - width) / max(width, height);
+        auto sy = (height - 2.0 * yy) / max(width, height);
+        Ray ray;
+        if (fisheye) {
+          auto sx_ = sx / Forward.length();
+          auto sy_ = sy / Forward.length();
+          auto rsquare = sx_ * sx_ + sy_ * sy_;
+          if (rsquare > 1)
+            return {};
+          ray = Ray(Eye,
+                    sx_ * Right + sy_ * Up +
+                        sqrt(1 - rsquare) * normalizedForward,
+                    true);
+
+        } else if (panorama) {
+          auto theta = (-.5 + 2.0 * -xx / width) * M_PI;
+          auto phi = (.5 - 1.0 * yy / height) * M_PI;
+          ray = Ray(Eye, sin(phi) * Up +
+                             cos(phi) * sin(theta) * normalizedForward +
+                             cos(phi) * cos(theta) * Right);
+        } else {
+          ray = Ray(Eye, sx * Right + sy * Up + Forward, true);
+        }
+        if (dof) {
+          auto interscet = ray.origin() + ray.direction() * focus;
+          vec3 random_move = random_in_unit_disk();
+          auto neworigin =
+              ray.origin() +
+              (random_move.x() * Right + random_move.y() * Up) * lens;
+          ray = Ray(neworigin, interscet - neworigin, true);
+        }
+        return world.getColor(ray, bounces, gid);
+      };
+      optional<vec3> color;
+      double a;
+      if (aaRays == 0) {
+        color = getColor();
+        a = color ? 1 : 0;
+      } else {
+        vec3 sum(0, 0, 0);
+        double suma = 0;
+        for (int i = 0; i < aaRays; i++) {
+          auto c = getColor();
+          if (c.has_value()) {
+            suma += 1;
+            sum += c.value() * 1;
+          }
+        }
+        if (suma == 0)
+          color = {};
+        else
+          color = sum / suma;
+        a = suma / aaRays;
+      }
       if (color.has_value()) {
         auto srgb = rgb2srgb(color.value());
+        srgb.mapeach([](double x) { return min(max(0.0, x), 1.0); });
         image(x, y, 0, 0) = srgb.r() * 255;
         image(x, y, 0, 1) = srgb.g() * 255;
         image(x, y, 0, 2) = srgb.b() * 255;
-        image(x, y, 0, 3) = 255;
+        image(x, y, 0, 3) = a * 255;
       } else {
         image(x, y, 0, 0) = 0;
         image(x, y, 0, 1) = 0;
@@ -187,5 +247,8 @@ int main(int argc, char *argv[]) {
         image(x, y, 0, 3) = 0;
       }
     }
+    if (width > 500 && width > 500)
+      cout << x << "/" << width << endl;
+  }
   image.save_png(filename.c_str());
 }

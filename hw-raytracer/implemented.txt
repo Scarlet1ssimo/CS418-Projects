@@ -1,25 +1,40 @@
-Inside (10 points)
-Plane (5 points)
-Triangle (15 points)
-Normal (5 points)
-Trit (15 points)
-Acceleration (30 points)
-Suns (5 points)
-Bulb (10 points)
-Neglight (5 points)
-More shadows (20 points)
-Expose (10 points)
-GI (20 points)
-Shininess (15 points)
-Transparency (20 points)
-Ior (5 points)
-Bounces (5 points)
-Roughness (10 points)
-Texture (10 points)
-Eye (5 points)
-Forward (10 points)
-Up (5 points)
-Fisheye (10 points)
-AA (15 points)
-Panorama (10 points)
-Dof(10 points)
+mpray_aa.txt
+mpray_color.txt
+mpray_eye.txt
+mpray_inside.txt
+mpray_normal.txt
+mpray_shadow-plane.txt
+mpray_shine3.txt
+mpray_suns.txt
+mpray_trans3.txt
+mpray_behind.txt
+mpray_dof.txt
+mpray_fisheye.txt
+mpray_ior.txt
+mpray_overlap.txt
+mpray_rough.txt
+mpray_shadow-suns.txt
+mpray_sphere.txt
+mpray_trif.txt
+mpray_bounces.txt
+mpray_expose1.txt
+mpray_forward.txt
+mpray_many.txt
+mpray_panorama.txt
+mpray_shadow-basic.txt
+mpray_shadow-triangle.txt
+mpray_tex.txt
+mpray_trit.txt
+mpray_bulb.txt
+mpray_expose2.txt
+mpray_gi.txt
+mpray_neglight.txt
+mpray_plane.txt
+mpray_shadow-bulb.txt
+mpray_shine1.txt
+mpray_sun.txt
+mpray_trans1.txt
+mpray_up.txt
+mpray_tenthousand.txt
+mpray_redchair.txt
+mpray_spiral.txt

@@ -2,7 +2,7 @@
 SRCS = $(wildcard test/*.txt)
 DONES=$(wildcard result/*.png)
 all:	$(SRCS:mpray%.txt=run%)
-done:	$(DONES:result/look_at_this_%.png=comp%)
+done:	comp_aa comp_color comp_eye comp_inside comp_normal comp_shadow-plane comp_shine3 comp_suns comp_trans3 comp_behind comp_dof comp_fisheye comp_ior comp_overlap comp_rough comp_shadow-suns comp_sphere comp_trif comp_bounces comp_expose1 comp_forward comp_many comp_panorama comp_shadow-basic comp_shadow-triangle comp_tex comp_trit comp_bulb comp_expose2 comp_gi comp_neglight comp_plane comp_shadow-bulb comp_shine1 comp_sun comp_trans1 comp_up
 
 run%: program
 	time ./program test/mpray$*.txt
@@ -32,3 +32,9 @@ clean:
 	rm *.png
 cleanresult: clean
 	rm result/*.png
+test_gprof: raytracer.cpp geometry.h
+	g++ -Wall -pg raytracer.cpp -o test_gprof -std=c++17 -lpng -O3
+gmon.out: test_gprof
+	./test_gprof test/mpray_redchair.txt
+analysis.txt: gmon.out
+	gprof test_gprof gmon.out > analysis.txt
