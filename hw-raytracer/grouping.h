@@ -133,7 +133,7 @@ struct Bulb : Light {
   }
 };
 struct ScarletBVH : BVH {
-  void selfBalance() override { settleLayer(0.6); }
+  void selfBalance() override;
   void settleLayer(double successRate);
   bool Scarlet();
   bool Amethyst(double successRate);

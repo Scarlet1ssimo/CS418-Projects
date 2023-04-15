@@ -224,6 +224,7 @@ bool ScarletBVH::Scarlet() {
   }
   return true;
 }
+void ScarletBVH::selfBalance() { settleLayer(0.6); }
 void ScarletBVH::settleLayer(double successRate) {
   assert(Gchild.size() == 0);
   if (!Amethyst(successRate)) {

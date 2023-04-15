@@ -30,14 +30,22 @@ void makeLight(shared_ptr<Light> lightptr) {
   lightptr->color = curColor;
   world.add(lightptr);
 }
-void showBVH(shared_ptr<BVH> bvh, int d = 0) {
-  if (d > 1)
+void showBVH(shared_ptr<BVH> bvh, int l, int r, int d = 0) {
+  if (d > r)
     return;
-  makeObj(make_shared<AABB>(vec3(bvh->a, bvh->b, bvh->c),
-                            vec3(bvh->A, bvh->B, bvh->C)));
+  if (d >= l) {
+    curColor = vec3(random_uniform(), random_uniform(), random_uniform());
+    makeObj(make_shared<AABB>(vec3(bvh->a, bvh->b, bvh->c),
+                              vec3(bvh->A, bvh->B, bvh->C)));
+  }
+  for (auto &p : bvh->Lchild) {
+    shared_ptr<BVH> b = make_shared<BVH>();
+    b->extendBy(p);
+    showBVH(b, l, r, d + 1);
+  }
   for (auto &p : bvh->Gchild) {
     if (auto pp = dynamic_pointer_cast<BVH>(p)) {
-      showBVH(pp, d + 1);
+      showBVH(pp, l, r, d + 1);
     }
   }
 }
@@ -172,16 +180,16 @@ int main(int argc, char *argv[]) {
   // second pass: render
 
   if (false) {
+    fisheye = false;
     panorama = false;
     dof = false;
     aaRays = 0;
     gid = 0;
     bounces = 10;
     MF.setIor(1);
-    MF.setShininess(0);
-    MF.setTransparency(0.9);
-    curColor = vec3(1, 1, 1);
-    ::showBVH(world.bvh);
+    MF.setShininess(0.1);
+    MF.setTransparency(0.7);
+    ::showBVH(world.bvh, 2, 2);
     width /= 4;
     height /= 4;
   }
