@@ -25,9 +25,9 @@ run: program
 CSRCS = $(wildcard *.cpp)
 COBJS = $(CSRCS:.cpp=.o)
 %.o: %.cpp
-	clang++  -c $< -o $@ $(CFLAGS)
+	g++  -c $< -o $@ $(CFLAGS)
 program: $(COBJS)
-	clang++ $^ -o $@ $(CFLAGS) -lpng
+	g++ $^ -o $@ $(CFLAGS) -lpng
 programdbg: $(CSRCS)
 	g++ -g -I. $^ -o $@ -std=c++17 -lpng
 gdb: programdbg
