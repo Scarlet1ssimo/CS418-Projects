@@ -1,27 +1,16 @@
-#define cimg_use_png
-#define cimg_display 0
-#include "CImg.h"
 #include "geometry.h"
 #include "grouping.h"
+#include "printer.h"
 #include "utility.h"
 #include "vec.h"
 #include <bits/stdc++.h>
 #include <fstream>
+#include <memory>
 using namespace std;
 
 World world;
-optional<double> expose_v;
-vec3 rgb2srgb(vec3 rgb) {
-  if (expose_v.has_value()) {
-    rgb = mapeach(rgb, [](double x) { return 1 - exp(-x * expose_v.value()); });
-  }
-  return mapeach(rgb, [](double x) {
-    return x <= 0.0031308 ? 12.92 * x : 1.055 * pow(x, 1.0 / 2.4) - 0.055;
-  });
-}
 
 vec3 curColor = vec3(1, 1, 1);
-int bounces = 4;
 vec3 Eye(0, 0, 0);
 vec3 Forward(0, 0, -1);
 vec3 Right(1, 0, 0);
@@ -41,6 +30,17 @@ void makeLight(shared_ptr<Light> lightptr) {
   lightptr->color = curColor;
   world.add(lightptr);
 }
+void showBVH(shared_ptr<BVH> bvh, int d = 0) {
+  if (d > 1)
+    return;
+  makeObj(make_shared<AABB>(vec3(bvh->a, bvh->b, bvh->c),
+                            vec3(bvh->A, bvh->B, bvh->C)));
+  for (auto &p : bvh->Gchild) {
+    if (auto pp = dynamic_pointer_cast<BVH>(p)) {
+      showBVH(pp, d + 1);
+    }
+  }
+}
 
 int main(int argc, char *argv[]) {
   // feenableexcept(FE_INVALID | FE_OVERFLOW);
@@ -59,9 +59,11 @@ int main(int argc, char *argv[]) {
   bool panorama = false;
   bool dof = false;
   double focus, lens;
+  int bounces = 4;
 
   // first pass: read scene
   ifstream fin(argv[1]);
+  optional<double> expose_v;
   for (string s; getline(fin, s);) {
     trim(s);
     remove_extra_space(s);
@@ -168,7 +170,22 @@ int main(int argc, char *argv[]) {
   cout << world.objs.size() << " objects" << endl;
   cout << world.lights.size() << " lights" << endl;
   // second pass: render
-  cimg_library::CImg<unsigned char> image(width, height, 1, 4);
+
+  if (false) {
+    panorama = false;
+    dof = false;
+    aaRays = 0;
+    gid = 0;
+    bounces = 10;
+    MF.setIor(1);
+    MF.setShininess(0);
+    MF.setTransparency(0.9);
+    curColor = vec3(1, 1, 1);
+    ::showBVH(world.bvh);
+    width /= 4;
+    height /= 4;
+  }
+  Printer PT(width, height, expose_v);
   auto normalizedForward = unit_vector(Forward);
   for (int x = 0; x < width; x++) {
     for (int y = 0; y < height; y++) {
@@ -234,21 +251,13 @@ int main(int argc, char *argv[]) {
         a = suma / aaRays;
       }
       if (color.has_value()) {
-        auto srgb = rgb2srgb(color.value());
-        srgb.mapeach([](double x) { return min(max(0.0, x), 1.0); });
-        image(x, y, 0, 0) = srgb.r() * 255;
-        image(x, y, 0, 1) = srgb.g() * 255;
-        image(x, y, 0, 2) = srgb.b() * 255;
-        image(x, y, 0, 3) = a * 255;
+        PT.put(x, y, color.value(), a);
       } else {
-        image(x, y, 0, 0) = 0;
-        image(x, y, 0, 1) = 0;
-        image(x, y, 0, 2) = 0;
-        image(x, y, 0, 3) = 0;
+        PT.put(x, y);
       }
     }
     if (width > 500 && width > 500)
       cout << x << "/" << width << endl;
   }
-  image.save_png(filename.c_str());
+  PT.save(filename);
 }
